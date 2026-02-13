@@ -2,6 +2,8 @@ using Scalar.AspNetCore;
 using Microsoft.EntityFrameworkCore;
 using OmniArchivum.Api.Data;
 using OmniArchivum.Api.Models.Entities;
+using OmniArchivum.Api.Services;
+
 
 
 
@@ -12,6 +14,11 @@ builder.Services.AddOpenApi();
 
 builder.Services.AddDbContext<OmniArchivumDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("OmniArchivumDb")));
+
+builder.Services.AddControllers();
+
+builder.Services.AddScoped<INotesService, NotesService>();
+
 
 var app = builder.Build();
 
@@ -24,7 +31,9 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-app.MapGet("/notes", async (OmniArchivumDbContext db) =>
+app.MapControllers();
+
+/*app.MapGet("/notes", async (OmniArchivumDbContext db) =>
     await db.Notes.OrderByDescending(n => n.UpdatedUtc).ToListAsync());
 
 app.MapPost("/notes", async (OmniArchivumDbContext db, Note note) =>
@@ -37,7 +46,7 @@ app.MapPost("/notes", async (OmniArchivumDbContext db, Note note) =>
     await db.SaveChangesAsync();
 
     return Results.Created($"/notes/{note.Id}", note);
-});
+}); */
 
 var summaries = new[]
 {

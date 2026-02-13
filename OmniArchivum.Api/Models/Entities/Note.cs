@@ -1,4 +1,5 @@
 ﻿namespace OmniArchivum.Api.Models.Entities;
+using NpgsqlTypes;
 
 public class Note
 {
@@ -11,4 +12,8 @@ public class Note
     public DateTimeOffset CreatedUtc { get; set; } = DateTimeOffset.UtcNow;
 
     public DateTimeOffset UpdatedUtc { get; set; } = DateTimeOffset.UtcNow;
+
+    public bool IsDeleted { get; set; } = false;
+
+    public NpgsqlTsVector SearchVector { get; set; } = default!;
 }

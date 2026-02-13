@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using NpgsqlTypes;
@@ -12,9 +13,11 @@ using OmniArchivum.Api.Data;
 namespace OmniArchivum.Api.Migrations
 {
     [DbContext(typeof(OmniArchivumDbContext))]
-    partial class OmniArchivumDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260213172818_AddNoteFullTextSearch")]
+    partial class AddNoteFullTextSearch
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
