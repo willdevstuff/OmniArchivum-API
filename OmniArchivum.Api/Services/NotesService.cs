@@ -14,14 +14,31 @@ public sealed class NotesService : INotesService
         _db = db;
     }
 
-    public async Task<List<NoteResponse>> GetAllAsync(int page, int pageSize)
+    public async Task<List<NoteResponse>> GetAllAsync(int page, int pageSize, IReadOnlyList<string>? tags)
     {
         if (page <= 0) page = 1;
         if (pageSize <= 0 || pageSize > 100) pageSize = 20;
 
-        return await _db.Notes
+        var query = _db.Notes
             .Include(n => n.NoteTags)
             .ThenInclude(nt => nt.Tag)
+            .AsQueryable();
+
+        if (tags is { Count: > 0 })
+        {
+            var normalized = tags
+                .Where(t => !string.IsNullOrWhiteSpace(t))
+                .Select(t => t.Trim().ToLowerInvariant())
+                .Distinct()
+                .ToList();
+
+            foreach (var t in normalized)
+            {
+                query = query.Where(n => n.NoteTags.Any(nt => nt.Tag.Name == t));
+            }
+        }
+
+        return await query
             .OrderByDescending(n => n.UpdatedUtc)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
@@ -32,17 +49,16 @@ public sealed class NotesService : INotesService
                 BodyMarkdown = n.BodyMarkdown,
                 CreatedUtc = n.CreatedUtc,
                 UpdatedUtc = n.UpdatedUtc,
-                Tags = n.NoteTags
-                    .Select(nt => new TagResponse
-                    {
-                        Id = nt.Tag.Id,
-                        Name = nt.Tag.Name,
-                        Category = nt.Tag.Category
-                    })
-                    .ToList()
+                Tags = n.NoteTags.Select(nt => new TagResponse
+                {
+                    Id = nt.Tag.Id,
+                    Name = nt.Tag.Name,
+                    Category = nt.Tag.Category
+                }).ToList()
             })
             .ToListAsync();
     }
+
 
 
 

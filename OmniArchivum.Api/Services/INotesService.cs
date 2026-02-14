@@ -4,7 +4,7 @@ namespace OmniArchivum.Api.Services;
 
 public interface INotesService
 {
-    Task<List<NoteResponse>> GetAllAsync(int page, int pageSize);
+    Task<List<NoteResponse>> GetAllAsync(int page, int pageSize, IReadOnlyList<string>? tags);
     Task<NoteResponse?> GetByIdAsync(Guid id);
     Task<NoteResponse> CreateAsync(CreateNoteRequest request);
     Task<bool> SoftDeleteAsync(Guid id);

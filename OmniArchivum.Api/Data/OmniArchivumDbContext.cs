@@ -57,6 +57,8 @@ public class OmniArchivumDbContext : DbContext
         {
             e.HasKey(nt => new { nt.NoteId, nt.TagId });
 
+            e.HasQueryFilter(nt => !nt.Note.IsDeleted);
+
             e.HasOne(nt => nt.Note)
                 .WithMany(n => n.NoteTags)
                 .HasForeignKey(nt => nt.NoteId);

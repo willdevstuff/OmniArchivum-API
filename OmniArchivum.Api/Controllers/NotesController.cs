@@ -15,10 +15,12 @@ public class NotesController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<List<NoteResponse>>> GetAll(
         [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 20)
+        [FromQuery] int pageSize = 20,
+        [FromQuery] List<string>? tag = null)
     {
-        return Ok(await _service.GetAllAsync(page, pageSize));
+        return Ok(await _service.GetAllAsync(page, pageSize, tag));
     }
+
 
     [HttpPost]
     public async Task<ActionResult<NoteResponse>> Create(CreateNoteRequest request)
