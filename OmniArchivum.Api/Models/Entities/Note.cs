@@ -16,4 +16,7 @@ public class Note
     public bool IsDeleted { get; set; } = false;
 
     public NpgsqlTsVector SearchVector { get; set; } = default!;
+
+    public ICollection<NoteTag> NoteTags { get; set; } = new List<NoteTag>();
+
 }

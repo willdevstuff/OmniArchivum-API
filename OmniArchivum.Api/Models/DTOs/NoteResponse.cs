@@ -7,4 +7,5 @@ public sealed class NoteResponse
     public string BodyMarkdown { get; set; } = string.Empty;
     public DateTimeOffset CreatedUtc { get; set; }
     public DateTimeOffset UpdatedUtc { get; set; }
+    public List<TagResponse> Tags { get; set; } = new();
 }

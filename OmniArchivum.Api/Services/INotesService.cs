@@ -9,4 +9,8 @@ public interface INotesService
     Task<NoteResponse> CreateAsync(CreateNoteRequest request);
     Task<bool> SoftDeleteAsync(Guid id);
     Task<List<NoteResponse>> SearchAsync(string query, int page, int pageSize);
+    Task<TagResponse> CreateTagAsync(CreateTagRequest request);
+    Task<bool> AddTagToNoteAsync(Guid noteId, Guid tagId);
+    Task<List<TagResponse>> GetAllTagsAsync();
+
 }
