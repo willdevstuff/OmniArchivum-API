@@ -19,6 +19,13 @@ builder.Services.AddControllers();
 
 builder.Services.AddScoped<INotesService, NotesService>();
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("Frontend", policy =>
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader());
+});
 
 var app = builder.Build();
 
@@ -27,49 +34,39 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
     app.MapScalarApiReference();
+
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<OmniArchivumDbContext>();
+    db.Database.Migrate();
+
+    if (!db.Notes.Any())
+    {
+        var tag = new Tag
+        {
+            Name = "test-tag",
+            Category = "demo"
+        };
+
+        var note = new Note
+        {
+            Title = "Test Note",
+            BodyMarkdown = "This is a sample note seeded automatically on first run. Feel free to edit or delete it."
+        };
+
+        note.NoteTags.Add(new NoteTag { Tag = tag });
+
+        db.Notes.Add(note);
+        db.SaveChanges();
+    }
 }
 
 app.UseHttpsRedirection();
 
+app.UseCors("Frontend");
+
 app.MapControllers();
-
-/*app.MapGet("/notes", async (OmniArchivumDbContext db) =>
-    await db.Notes.OrderByDescending(n => n.UpdatedUtc).ToListAsync());
-
-app.MapPost("/notes", async (OmniArchivumDbContext db, Note note) =>
-{
-    note.Id = Guid.NewGuid();
-    note.CreatedUtc = DateTimeOffset.UtcNow;
-    note.UpdatedUtc = note.CreatedUtc;
-
-    db.Notes.Add(note);
-    await db.SaveChangesAsync();
-
-    return Results.Created($"/notes/{note.Id}", note);
-}); */
-
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
-
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
 
 app.Run();
 
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
+// Exposes Program for WebApplicationFactory<Program> in OmniArchivum.Api.Tests.
+public partial class Program { }
