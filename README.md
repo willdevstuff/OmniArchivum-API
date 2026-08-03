@@ -1,6 +1,8 @@
 
 # OmniArchivum API
 
+[![CI](https://github.com/willdevstuff/OmniArchivum-API/actions/workflows/ci.yml/badge.svg)](https://github.com/willdevstuff/OmniArchivum-API/actions/workflows/ci.yml)
+
 **OmniArchivum** is a structured backend knowledge archive API built with **ASP.NET Core 10**, **PostgreSQL**, and **Entity Framework Core**.
 
 It is designed to store and query technical knowledge such as game development setups, programming solutions, music production chains, and workflow notes using rich search and flexible tagging.
@@ -33,6 +35,20 @@ It is designed to store and query technical knowledge such as game development s
 - Multi-tag AND filtering  
   `/api/notes?tag=unity&tag=fmod`
 
+### Frontend
+
+- Plain HTML, CSS, and vanilla JavaScript (no framework, no build step)
+- Lists, searches, and paginates notes
+- Filters notes by tag, with tags grouped and color-coded by category
+- Creates, edits, and deletes notes; links/unlinks tags on notes; deletes tags outright
+- Talks to the API directly via `fetch`
+
+### Testing
+
+- Unit tests for the service layer against SQLite in-memory (fast, no Docker required)
+- Integration tests against a real, disposable PostgreSQL container (Testcontainers) — covers full-text search behavior that no in-memory provider can reproduce
+- HTTP-level tests via `WebApplicationFactory` exercising the real routing/DI pipeline
+
 ---
 
 ## Tech Stack
@@ -40,10 +56,12 @@ It is designed to store and query technical knowledge such as game development s
 | Layer        | Technology                         |
 |--------------|------------------------------------|
 | Runtime      | .NET 10 (ASP.NET Core Web API)     |
+| Frontend     | HTML, CSS, vanilla JavaScript      |
 | Database     | PostgreSQL 16 (Docker)             |
 | ORM          | Entity Framework Core (Npgsql)     |
 | Search       | PostgreSQL `tsvector` + GIN index  |
 | API Docs     | OpenAPI + Scalar                   |
+| Testing      | xUnit, SQLite (unit), Testcontainers + Postgres (integration) |
 | Tooling      | PowerShell dev helpers             |
 | Versioning   | Git + GitHub                       |
 
@@ -73,9 +91,26 @@ docker compose up -d
 cd OmniArchivum.Api
 dotnet run
 
+In Development, the API automatically applies EF Core migrations and seeds a sample "Test Note" (with a "test-tag" tag) on first run if the database is empty, so there's something to see immediately.
+
 ### 4. Open API documentation
 
 http://localhost:5000/scalar/v1
+
+### 5. Run the frontend
+
+The frontend is static HTML/CSS/JS with no build step, but it uses ES modules, which browsers won't load over `file://`. Serve it with any static file server while the API (step 3) is running:
+
+cd frontend
+python -m http.server 8080
+
+Then open http://localhost:8080. It talks to the API at `http://localhost:5000` by default (see `API_BASE` in `frontend/js/api.js`).
+
+### 6. Run the tests
+
+dotnet test
+
+Requires Docker Desktop running (the integration tests spin up a real, disposable PostgreSQL container via Testcontainers — this is deliberate, since full-text search relies on `tsvector`/GIN behavior that's specific to Postgres and can't be validated against an in-memory or SQLite substitute). Everything else in the suite runs against SQLite in-memory, so most of it is fast and doesn't touch Docker at all.
 
 ---
 
@@ -152,7 +187,7 @@ PostgreSQL (Docker)
 - Tag negation filtering
 - Hierarchical categories
 - Authentication and user support
-- Deployment / CI configuration
+- Deployment
 
 ---
 
