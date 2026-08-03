@@ -37,6 +37,14 @@ public class NotesController : ControllerBase
         return Ok(note);
     }
 
+    [HttpPut("{id:guid}")]
+    public async Task<ActionResult<NoteResponse>> Update(Guid id, UpdateNoteRequest request)
+    {
+        var updated = await _service.UpdateAsync(id, request);
+        if (updated is null) return NotFound();
+        return Ok(updated);
+    }
+
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id) //dont remove deleted notes. just mark them. they will then be ignored by queries.
     {

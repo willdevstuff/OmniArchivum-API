@@ -149,6 +149,39 @@ public sealed class NotesService : INotesService
         };
     }
 
+    public async Task<NoteResponse?> UpdateAsync(Guid id, UpdateNoteRequest request)
+    {
+        var note = await _db.Notes
+            .Include(n => n.NoteTags)
+            .ThenInclude(nt => nt.Tag)
+            .FirstOrDefaultAsync(n => n.Id == id);
+
+        if (note is null) return null;
+
+        note.Title = request.Title.Trim();
+        note.BodyMarkdown = request.BodyMarkdown;
+        note.UpdatedUtc = DateTimeOffset.UtcNow;
+
+        await _db.SaveChangesAsync();
+
+        return new NoteResponse
+        {
+            Id = note.Id,
+            Title = note.Title,
+            BodyMarkdown = note.BodyMarkdown,
+            CreatedUtc = note.CreatedUtc,
+            UpdatedUtc = note.UpdatedUtc,
+            Tags = note.NoteTags
+                .Select(nt => new TagResponse
+                {
+                    Id = nt.Tag.Id,
+                    Name = nt.Tag.Name,
+                    Category = nt.Tag.Category
+                })
+                .ToList()
+        };
+    }
+
     public async Task<bool> SoftDeleteAsync(Guid id)
     {
         var note = await _db.Notes.FirstOrDefaultAsync(n => n.Id == id);
@@ -207,6 +240,31 @@ public sealed class NotesService : INotesService
             TagId = tagId
         });
 
+        await _db.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<bool> RemoveTagFromNoteAsync(Guid noteId, Guid tagId)
+    {
+        var link = await _db.NoteTags
+            .FirstOrDefaultAsync(nt => nt.NoteId == noteId && nt.TagId == tagId);
+
+        if (link is null) return false;
+
+        _db.NoteTags.Remove(link);
+        await _db.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<bool> DeleteTagAsync(Guid tagId)
+    {
+        var tag = await _db.Tags
+            .Include(t => t.NoteTags)
+            .FirstOrDefaultAsync(t => t.Id == tagId);
+
+        if (tag is null) return false;
+
+        _db.Tags.Remove(tag);
         await _db.SaveChangesAsync();
         return true;
     }

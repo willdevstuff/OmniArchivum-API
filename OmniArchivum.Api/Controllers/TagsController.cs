@@ -44,4 +44,24 @@ public class TagsController : ControllerBase
 
         return NoContent();
     }
+
+    // Unlink a tag from a note (does not delete the tag itself)
+    [HttpDelete("{tagId:guid}/notes/{noteId:guid}")]
+    public async Task<IActionResult> RemoveTagFromNote(Guid tagId, Guid noteId)
+    {
+        var ok = await _service.RemoveTagFromNoteAsync(noteId, tagId);
+        if (!ok) return NotFound();
+
+        return NoContent();
+    }
+
+    // Delete the tag itself; unlinks it from every note it's attached to
+    [HttpDelete("{tagId:guid}")]
+    public async Task<IActionResult> Delete(Guid tagId)
+    {
+        var ok = await _service.DeleteTagAsync(tagId);
+        if (!ok) return NotFound();
+
+        return NoContent();
+    }
 }

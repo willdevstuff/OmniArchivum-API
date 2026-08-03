@@ -7,10 +7,12 @@ public interface INotesService
     Task<List<NoteResponse>> GetAllAsync(int page, int pageSize, IReadOnlyList<string>? tags);
     Task<NoteResponse?> GetByIdAsync(Guid id);
     Task<NoteResponse> CreateAsync(CreateNoteRequest request);
+    Task<NoteResponse?> UpdateAsync(Guid id, UpdateNoteRequest request);
     Task<bool> SoftDeleteAsync(Guid id);
     Task<List<NoteResponse>> SearchAsync(string query, int page, int pageSize);
     Task<TagResponse> CreateTagAsync(CreateTagRequest request);
     Task<bool> AddTagToNoteAsync(Guid noteId, Guid tagId);
+    Task<bool> RemoveTagFromNoteAsync(Guid noteId, Guid tagId);
+    Task<bool> DeleteTagAsync(Guid tagId);
     Task<List<TagResponse>> GetAllTagsAsync();
-
 }
