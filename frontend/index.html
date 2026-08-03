@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OmniArchivum</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <h1>OmniArchivum</h1>
+
+      <form id="search-form" class="search-form">
+        <input id="search-input" type="search" placeholder="Search notes..." autocomplete="off" />
+        <button type="submit">Search</button>
+        <button type="button" id="clear-search-btn" hidden>Clear</button>
+      </form>
+
+      <button id="new-note-btn" class="primary">+ New note</button>
+    </header>
+
+    <div class="layout">
+      <aside class="sidebar">
+        <h2>Tags</h2>
+        <div id="tag-list" class="tag-list">
+          <p class="empty-hint">No tags yet.</p>
+        </div>
+
+        <form id="new-tag-form" class="new-tag-form">
+          <input id="new-tag-name" placeholder="New tag name" maxlength="64" required />
+          <input id="new-tag-category" placeholder="Category (optional)" maxlength="32" />
+          <button type="submit">Add tag</button>
+        </form>
+      </aside>
+
+      <main>
+        <div id="status-bar" class="status-bar" hidden></div>
+
+        <div id="notes-grid" class="notes-grid"></div>
+
+        <div class="pagination">
+          <button id="prev-page-btn" disabled>&larr; Prev</button>
+          <span id="page-indicator">Page 1</span>
+          <button id="next-page-btn" disabled>Next &rarr;</button>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <dialog id="new-note-dialog">
+    <form id="new-note-form">
+      <h2 id="note-dialog-title">New note</h2>
+      <label>
+        Title
+        <input id="note-title-input" maxlength="200" required />
+      </label>
+      <label>
+        Body (Markdown)
+        <textarea id="note-body-input" rows="10" required></textarea>
+      </label>
+      <div class="dialog-actions">
+        <button type="button" id="cancel-new-note-btn">Cancel</button>
+        <button type="submit" id="note-submit-btn" class="primary">Create</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="confirm-dialog">
+    <p id="confirm-message"></p>
+    <div class="dialog-actions">
+      <button type="button" id="confirm-cancel-btn">Cancel</button>
+      <button type="button" id="confirm-ok-btn" class="danger">Delete</button>
+    </div>
+  </dialog>
+
+  <template id="note-card-template">
+    <article class="note-card">
+      <header>
+        <h3 class="note-title"></h3>
+        <div class="card-actions">
+          <button class="edit-btn" title="Edit note" aria-label="Edit note">&#9998;</button>
+          <button class="delete-btn" title="Delete note" aria-label="Delete note">&times;</button>
+        </div>
+      </header>
+      <p class="note-body"></p>
+      <button class="expand-btn" hidden>Show more</button>
+      <div class="note-tags"></div>
+      <div class="note-tag-add">
+        <select class="tag-select">
+          <option value="">+ add tag&hellip;</option>
+        </select>
+      </div>
+      <footer class="note-meta"></footer>
+    </article>
+  </template>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
