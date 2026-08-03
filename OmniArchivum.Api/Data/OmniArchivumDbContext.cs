@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using OmniArchivum.Api.Models.Entities;
 
 namespace OmniArchivum.Api.Data;
@@ -28,13 +29,23 @@ public class OmniArchivumDbContext : DbContext
 
             e.HasQueryFilter(n => !n.IsDeleted);
 
-            e.HasGeneratedTsVectorColumn(
-                    n => n.SearchVector,
-                    "english",
-                    n => new { n.Title, n.BodyMarkdown });
+            // SearchVector relies on Npgsql-specific generated columns and GIN indexing,
+            // which only make sense against a real Postgres provider. Other providers
+            // (e.g. SQLite, used for fast unit tests) simply don't map the column.
+            if (Database.IsNpgsql())
+            {
+                e.HasGeneratedTsVectorColumn(
+                        n => n.SearchVector,
+                        "english",
+                        n => new { n.Title, n.BodyMarkdown });
 
-            e.HasIndex(n => n.SearchVector)
-                .HasMethod("GIN");
+                e.HasIndex(n => n.SearchVector)
+                    .HasMethod("GIN");
+            }
+            else
+            {
+                e.Ignore(n => n.SearchVector);
+            }
         });
 
         modelBuilder.Entity<Tag>(e =>
@@ -68,5 +79,22 @@ public class OmniArchivumDbContext : DbContext
                 .HasForeignKey(nt => nt.TagId);
         });
 
+        // SQLite (used for fast unit tests) has no native DateTimeOffset type and can't
+        // translate ORDER BY on one. Store it as a sortable long instead — Postgres keeps
+        // its native representation since it handles DateTimeOffset natively.
+        if (!Database.IsNpgsql())
+        {
+            var converter = new DateTimeOffsetToBinaryConverter();
+            foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+            {
+                foreach (var property in entityType.GetProperties())
+                {
+                    if (property.ClrType == typeof(DateTimeOffset) || property.ClrType == typeof(DateTimeOffset?))
+                    {
+                        property.SetValueConverter(converter);
+                    }
+                }
+            }
+        }
     }
 }
