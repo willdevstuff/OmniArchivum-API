@@ -1,5 +1,7 @@
+using System.Threading.RateLimiting;
 using Scalar.AspNetCore;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using OmniArchivum.Api.Data;
 using OmniArchivum.Api.Services;
@@ -21,6 +23,35 @@ builder.Services.AddScoped<INotesService, NotesService>();
 
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<OmniArchivumDbContext>();
+
+// This API is publicly writable so the demo is genuinely usable, which also means
+// anyone can script it. Reads are deliberately unrestricted — browsing and searching
+// should never be throttled — while writes are capped per client IP, which is enough
+// to stop bulk junk without getting in a real visitor's way.
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+    {
+        if (HttpMethods.IsGet(context.Request.Method) ||
+            HttpMethods.IsHead(context.Request.Method) ||
+            HttpMethods.IsOptions(context.Request.Method))
+        {
+            return RateLimitPartition.GetNoLimiter("reads");
+        }
+
+        // Accurate only because UseForwardedHeaders runs first — without it every
+        // request would look like it came from the Container Apps ingress.
+        var clientIp = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+        return RateLimitPartition.GetFixedWindowLimiter(clientIp, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 20,
+            Window = TimeSpan.FromMinutes(1)
+        });
+    });
+});
 
 builder.Services.AddCors(options =>
 {
@@ -65,6 +96,10 @@ app.UseForwardedHeaders(new ForwardedHeadersOptions
 app.UseHttpsRedirection();
 
 app.UseCors("Frontend");
+
+// After UseCors, so a rejected request still carries CORS headers and the browser
+// can read the 429 rather than reporting an opaque network error.
+app.UseRateLimiter();
 
 app.MapControllers();
 
