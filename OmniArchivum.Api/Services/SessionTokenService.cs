@@ -63,15 +63,22 @@ public sealed class SessionTokenService
         ClockSkew = TimeSpan.FromMinutes(1)
     };
 
+    /// <summary>
+    /// How long a guest token stays valid.
+    ///
+    /// This must never outlive <see cref="GuestDataCleaner"/>'s retention window. If a
+    /// token were still valid after its data had been reclaimed, a returning visitor
+    /// would get a successful response containing an empty archive — no error, no
+    /// re-seed, just a blank page that looks broken. Keeping the token the shorter of
+    /// the two means expiry always comes first, so they get a 401, the client quietly
+    /// starts a fresh session, and they land on a freshly seeded archive.
+    /// </summary>
+    public static readonly TimeSpan GuestSessionLifetime = TimeSpan.FromDays(2);
+
     public static string NewGuestOwnerKey() => GuestPrefix + Guid.NewGuid().ToString("N");
 
-    public IssuedSession IssueGuestSession()
-    {
-        // Long-lived because losing it means losing your sandbox mid-visit, and a guest
-        // token grants access to nothing but its own throwaway data.
-        var ownerKey = NewGuestOwnerKey();
-        return Issue(ownerKey, TimeSpan.FromDays(7));
-    }
+    public IssuedSession IssueGuestSession() =>
+        Issue(NewGuestOwnerKey(), GuestSessionLifetime);
 
     public IssuedSession IssueUserSession(string userName) =>
         Issue(UserPrefix + userName, TimeSpan.FromDays(30));

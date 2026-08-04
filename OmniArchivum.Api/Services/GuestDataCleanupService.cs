@@ -7,7 +7,15 @@ namespace OmniArchivum.Api.Services;
 /// </summary>
 public sealed class GuestDataCleanupService : BackgroundService
 {
-    private static readonly TimeSpan Retention = TimeSpan.FromDays(2);
+    /// <summary>
+    /// Deliberately longer than <see cref="SessionTokenService.GuestSessionLifetime"/>.
+    /// Data must never disappear while a token for it is still valid, or the visitor sees
+    /// an empty archive instead of being handed a fresh one. The extra day is slack so
+    /// the two can't cross even with clock skew or a delayed cleanup pass.
+    /// </summary>
+    public static readonly TimeSpan Retention =
+        SessionTokenService.GuestSessionLifetime + TimeSpan.FromDays(1);
+
     private static readonly TimeSpan Interval = TimeSpan.FromHours(6);
 
     private readonly IServiceProvider _services;
