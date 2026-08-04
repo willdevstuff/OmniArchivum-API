@@ -55,3 +55,44 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository_owner }}/omniarchivum-api:latest
             ghcr.io/${{ github.repository_owner }}/omniarchivum-api:${{ github.sha }}
+
+  deploy-api:
+    needs: build-and-push-image
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Log in to Azure (OIDC, no stored password)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Update Container App to the newly built image
+        run: |
+          az containerapp update \
+            --name omniarchivum-api \
+            --resource-group omniarchivum-rg \
+            --image ghcr.io/${{ github.repository_owner }}/omniarchivum-api:${{ github.sha }}
+
+  deploy-frontend:
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy to Azure Static Web Apps
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: "upload"
+          app_location: "frontend"
+          output_location: ""
+          skip_app_build: true
