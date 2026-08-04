@@ -2,7 +2,6 @@ using Scalar.AspNetCore;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using OmniArchivum.Api.Data;
-using OmniArchivum.Api.Models.Entities;
 using OmniArchivum.Api.Services;
 
 
@@ -36,35 +35,23 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
-    app.MapScalarApiReference();
+// Interactive API docs are served in every environment on purpose: this is a public
+// portfolio API, and browsable docs are part of what it's demonstrating. There is no
+// private data behind it and every endpoint is already publicly reachable.
+app.MapOpenApi();
+app.MapScalarApiReference();
 
+// Apply migrations at startup so both a fresh clone and a fresh deploy against an empty
+// database work with no manual step. EF Core takes an advisory lock before applying, so
+// this stays safe when more than one replica starts at once.
+// Skipped under "Testing", where the test fixture owns schema setup.
+if (!app.Environment.IsEnvironment("Testing"))
+{
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<OmniArchivumDbContext>();
+
     db.Database.Migrate();
-
-    if (!db.Notes.Any())
-    {
-        var tag = new Tag
-        {
-            Name = "test-tag",
-            Category = "demo"
-        };
-
-        var note = new Note
-        {
-            Title = "Test Note",
-            BodyMarkdown = "This is a sample note seeded automatically on first run. Feel free to edit or delete it."
-        };
-
-        note.NoteTags.Add(new NoteTag { Tag = tag });
-
-        db.Notes.Add(note);
-        db.SaveChanges();
-    }
+    DemoData.SeedIfEmpty(db);
 }
 
 // Azure Container Apps' ingress terminates TLS and forwards plain HTTP internally.
