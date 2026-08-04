@@ -590,7 +590,20 @@ dialog textarea {
 }
 
 @media (max-width: 700px) {
+  /* Stacking the grid puts the tag sidebar above the notes, which means a phone
+     visitor scrolls a full screen of tags before seeing any content. Switch to a
+     flex column so the notes can be pulled above the sidebar — search stays at the
+     top of the page, so filtering by tag is still one scroll away. */
   .layout {
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .layout main {
+    order: 1;
+  }
+
+  .layout .sidebar {
+    order: 2;
   }
 }
