@@ -1,4 +1,5 @@
 using Scalar.AspNetCore;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using OmniArchivum.Api.Data;
 using OmniArchivum.Api.Models.Entities;
@@ -18,6 +19,9 @@ builder.Services.AddDbContext<OmniArchivumDbContext>(options =>
 builder.Services.AddControllers();
 
 builder.Services.AddScoped<INotesService, NotesService>();
+
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<OmniArchivumDbContext>();
 
 builder.Services.AddCors(options =>
 {
@@ -60,11 +64,21 @@ if (app.Environment.IsDevelopment())
     }
 }
 
+// Azure Container Apps' ingress terminates TLS and forwards plain HTTP internally.
+// Without this, UseHttpsRedirection() below would see every request as insecure and
+// redirect-loop, since it can't see the client's original scheme was https.
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+});
+
 app.UseHttpsRedirection();
 
 app.UseCors("Frontend");
 
 app.MapControllers();
+
+app.MapHealthChecks("/health");
 
 app.Run();
 
