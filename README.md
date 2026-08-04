@@ -14,6 +14,10 @@ automated CI/CD.
 | **API** | https://omniarchivum-api.proudmoss-5344fb15.uksouth.azurecontainerapps.io/api/notes |
 | **Interactive API docs** | https://omniarchivum-api.proudmoss-5344fb15.uksouth.azurecontainerapps.io/scalar/v1 |
 
+> **Every visitor gets their own private copy of the archive.** Create, edit and delete
+> whatever you like — nobody else sees it, and you're not editing anyone else's. Guest
+> data is reclaimed automatically after a couple of days.
+
 > The API runs on Azure Container Apps with **scale-to-zero**, so the first request after an
 > idle period spends 20–30 seconds starting a container before responding. The frontend
 > shows a loading state and explains this rather than appearing to hang. Everything after
@@ -41,6 +45,16 @@ solutions, music production chains, workflow notes — using rich search and fle
 - `Tag` entities (many-to-many with notes, with optional categories)
 - Soft delete via global query filter
 - Full-text search using PostgreSQL `tsvector` + GIN index
+
+### Session Isolation
+
+- Every visitor gets a sandboxed archive of their own, seeded with the demo content
+- One `OwnerKey` column and one EF Core global query filter scope every read and write —
+  guest sessions and the signed-in owner are the same code path
+- Ownership is derived from a signed bearer token, so a caller can't name another
+  session; endpoints return `401` without one rather than an empty archive
+- A background job reclaims guest data after two days
+- Writes are additionally rate-limited per IP; reads never are
 
 ### Search & Filtering
 
@@ -253,6 +267,14 @@ Optional PowerShell helper functions live in `Scripts/dev-tools.ps1`. Load them 
   running on Npgsql, so the same model can back fast SQLite-based unit tests
 - The Markdown renderer escapes HTML *before* applying any transform, so user-supplied note
   bodies on the public demo cannot inject markup
+- Per-session isolation is a single `OwnerKey` column rather than a database per visitor:
+  creating a database per session would mean running migrations and holding a connection
+  pool per visitor, which doesn't scale and buys nothing over a query filter
+- `SaveChanges` stamps the owner on insert, so a future write path can't create unowned —
+  and therefore invisible — rows by forgetting to set it
+- Sessions use bearer tokens rather than cookies because the frontend and API are on
+  different sites: a cookie there would be a third-party cookie, which Safari blocks
+  outright and Chrome is phasing out
 
 ---
 
