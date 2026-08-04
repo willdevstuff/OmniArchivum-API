@@ -55,10 +55,53 @@
         Title
         <input id="note-title-input" maxlength="200" required />
       </label>
-      <label>
+      <label class="body-label">
         Body (Markdown)
         <textarea id="note-body-input" rows="10" required></textarea>
       </label>
+
+      <details class="format-help">
+        <summary>Formatting help</summary>
+        <table class="format-help-table">
+          <tbody>
+            <tr>
+              <td><code>**bold**</code></td>
+              <td><strong>bold</strong></td>
+            </tr>
+            <tr>
+              <td><code>*italic*</code></td>
+              <td><em>italic</em></td>
+            </tr>
+            <tr>
+              <td><code># Heading</code></td>
+              <td><span class="fh-heading">Heading</span></td>
+            </tr>
+            <tr>
+              <td><code>- item</code></td>
+              <td>Bulleted list</td>
+            </tr>
+            <tr>
+              <td><code>1. item</code></td>
+              <td>Numbered list</td>
+            </tr>
+            <tr>
+              <td><code>`code`</code></td>
+              <td><code class="md-code-inline">code</code></td>
+            </tr>
+            <tr>
+              <td><pre class="fh-fence">```
+code block
+```</pre></td>
+              <td>Multi-line code block</td>
+            </tr>
+            <tr>
+              <td><code>[text](https://…)</code></td>
+              <td><span class="fh-link">text</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </details>
+
       <div class="dialog-actions">
         <button type="button" id="cancel-new-note-btn">Cancel</button>
         <button type="submit" id="note-submit-btn" class="primary">Create</button>
