@@ -12,6 +12,8 @@ namespace OmniArchivum.Api.Tests.Unit;
 // SQLite can't reproduce — see Integration/SearchIntegrationTests.cs for that.
 public sealed class NotesServiceTests : IDisposable
 {
+    private const string TestOwner = "guest:test-owner";
+
     private readonly SqliteConnection _connection;
     private readonly OmniArchivumDbContext _db;
     private readonly NotesService _service;
@@ -21,14 +23,21 @@ public sealed class NotesServiceTests : IDisposable
         _connection = new SqliteConnection("DataSource=:memory:");
         _connection.Open();
 
+        _db = CreateContext(TestOwner);
+        _db.Database.EnsureCreated();
+
+        _service = new NotesService(_db);
+    }
+
+    // A second context on the same database but a different owner, for proving that
+    // one session cannot see another's data.
+    private OmniArchivumDbContext CreateContext(string ownerKey)
+    {
         var options = new DbContextOptionsBuilder<OmniArchivumDbContext>()
             .UseSqlite(_connection)
             .Options;
 
-        _db = new OmniArchivumDbContext(options);
-        _db.Database.EnsureCreated();
-
-        _service = new NotesService(_db);
+        return new OmniArchivumDbContext(options, new StaticOwnerContext(ownerKey));
     }
 
     public void Dispose()
@@ -194,5 +203,73 @@ public sealed class NotesServiceTests : IDisposable
 
         Assert.Single(results);
         Assert.Equal(noteWithBoth.Id, results[0].Id);
+    }
+
+    // Session isolation. These are the tests that matter for the public demo: one
+    // visitor's activity must be completely invisible to another's.
+
+    [Fact]
+    public async Task NotesAreInvisibleToOtherOwners()
+    {
+        var mine = await _service.CreateAsync(new CreateNoteRequest { Title = "Mine", BodyMarkdown = "b" });
+
+        using var otherDb = CreateContext("guest:someone-else");
+        var otherService = new NotesService(otherDb);
+
+        var theirNotes = await otherService.GetAllAsync(1, 20, null);
+        Assert.Empty(theirNotes);
+
+        var directLookup = await otherService.GetByIdAsync(mine.Id);
+        Assert.Null(directLookup);
+    }
+
+    [Fact]
+    public async Task AnotherOwnerCannotDeleteOrEditMyNote()
+    {
+        var mine = await _service.CreateAsync(new CreateNoteRequest { Title = "Mine", BodyMarkdown = "b" });
+
+        using var otherDb = CreateContext("guest:someone-else");
+        var otherService = new NotesService(otherDb);
+
+        // Knowing the id is not enough — the row is outside their filter entirely.
+        Assert.False(await otherService.SoftDeleteAsync(mine.Id));
+        Assert.Null(await otherService.UpdateAsync(mine.Id, new UpdateNoteRequest { Title = "Hijacked", BodyMarkdown = "x" }));
+
+        var stillMine = await _service.GetByIdAsync(mine.Id);
+        Assert.NotNull(stillMine);
+        Assert.Equal("Mine", stillMine!.Title);
+    }
+
+    [Fact]
+    public async Task TagsAreInvisibleToOtherOwners()
+    {
+        await _service.CreateTagAsync(new CreateTagRequest { Name = "unity" });
+
+        using var otherDb = CreateContext("guest:someone-else");
+        var otherService = new NotesService(otherDb);
+
+        Assert.Empty(await otherService.GetAllTagsAsync());
+    }
+
+    [Fact]
+    public async Task TheSameTagNameCanExistForDifferentOwners()
+    {
+        await _service.CreateTagAsync(new CreateTagRequest { Name = "unity" });
+
+        using var otherDb = CreateContext("guest:someone-else");
+        var otherService = new NotesService(otherDb);
+
+        // Uniqueness is per owner, so this must not collide with the tag above.
+        var theirs = await otherService.CreateTagAsync(new CreateTagRequest { Name = "unity" });
+        Assert.Equal("unity", theirs.Name);
+    }
+
+    [Fact]
+    public async Task NewEntitiesAreStampedWithTheCurrentOwner()
+    {
+        var note = await _service.CreateAsync(new CreateNoteRequest { Title = "N", BodyMarkdown = "b" });
+
+        var stored = await _db.Notes.IgnoreQueryFilters().SingleAsync(n => n.Id == note.Id);
+        Assert.Equal(TestOwner, stored.OwnerKey);
     }
 }

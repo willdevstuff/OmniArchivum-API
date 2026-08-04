@@ -1,13 +1,11 @@
 using System.Threading.RateLimiting;
 using Scalar.AspNetCore;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using OmniArchivum.Api.Data;
 using OmniArchivum.Api.Services;
-
-
-
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -20,6 +18,31 @@ builder.Services.AddDbContext<OmniArchivumDbContext>(options =>
 builder.Services.AddControllers();
 
 builder.Services.AddScoped<INotesService, NotesService>();
+
+// Every read and write is scoped to an owner taken from the caller's signed token, so
+// each guest session sees only its own copy of the archive.
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<IOwnerContext, OwnerContext>();
+
+// One instance, shared between issuing and validating. Two instances would each
+// generate their own ephemeral key when none is configured, so tokens issued by one
+// would fail validation by the other.
+var sessionTokens = new SessionTokenService(builder.Configuration, builder.Environment);
+builder.Services.AddSingleton(sessionTokens);
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options => options.TokenValidationParameters = sessionTokens.ValidationParameters);
+
+builder.Services.AddAuthorization();
+
+// Each guest session gets its own copy of the demo archive, so old ones have to be
+// reclaimed or the database grows with every visit.
+builder.Services.AddScoped<GuestDataCleaner>();
+
+if (!builder.Environment.IsEnvironment("Testing"))
+{
+    builder.Services.AddHostedService<GuestDataCleanupService>();
+}
 
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<OmniArchivumDbContext>();
@@ -76,13 +99,14 @@ app.MapScalarApiReference();
 // database work with no manual step. EF Core takes an advisory lock before applying, so
 // this stays safe when more than one replica starts at once.
 // Skipped under "Testing", where the test fixture owns schema setup.
+// Seeding is no longer done here: demo content now belongs to a session and is created
+// when one is issued, so each visitor gets their own copy rather than sharing one.
 if (!app.Environment.IsEnvironment("Testing"))
 {
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<OmniArchivumDbContext>();
 
     db.Database.Migrate();
-    DemoData.SeedIfEmpty(db);
 }
 
 // Azure Container Apps' ingress terminates TLS and forwards plain HTTP internally.
@@ -100,6 +124,9 @@ app.UseCors("Frontend");
 // After UseCors, so a rejected request still carries CORS headers and the browser
 // can read the 429 rather than reporting an opaque network error.
 app.UseRateLimiter();
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapControllers();
 

@@ -23,7 +23,7 @@ public sealed class SearchIntegrationTests
     [Fact]
     public async Task SearchAsync_FindsNote_ByWordInBody()
     {
-        await using var db = _fixture.CreateContext();
+        await using var db = _fixture.CreateContext($"guest:{Guid.NewGuid():N}");
         var service = new NotesService(db);
 
         var unique = Guid.NewGuid().ToString("N");
@@ -42,7 +42,7 @@ public sealed class SearchIntegrationTests
     [Fact]
     public async Task SearchAsync_DoesNotMatch_UnrelatedWords()
     {
-        await using var db = _fixture.CreateContext();
+        await using var db = _fixture.CreateContext($"guest:{Guid.NewGuid():N}");
         var service = new NotesService(db);
 
         var unique = Guid.NewGuid().ToString("N");
@@ -61,7 +61,7 @@ public sealed class SearchIntegrationTests
     [Fact]
     public async Task SearchAsync_ExcludesSoftDeletedNotes()
     {
-        await using var db = _fixture.CreateContext();
+        await using var db = _fixture.CreateContext($"guest:{Guid.NewGuid():N}");
         var service = new NotesService(db);
 
         var unique = Guid.NewGuid().ToString("N");
@@ -76,5 +76,25 @@ public sealed class SearchIntegrationTests
         var results = await service.SearchAsync($"findable-{unique}", 1, 20);
 
         Assert.DoesNotContain(results, n => n.Id == note.Id);
+    }
+
+    [Fact]
+    public async Task SearchAsync_DoesNotReachAcrossOwners()
+    {
+        var unique = Guid.NewGuid().ToString("N");
+
+        await using var mine = _fixture.CreateContext($"guest:{Guid.NewGuid():N}");
+        await new NotesService(mine).CreateAsync(new CreateNoteRequest
+        {
+            Title = $"Private note {unique}",
+            BodyMarkdown = $"Contains secretword-{unique} in the body."
+        });
+
+        // Full-text search runs in Postgres, so this proves the owner filter is applied
+        // inside the generated SQL rather than only in application-level LINQ.
+        await using var theirs = _fixture.CreateContext($"guest:{Guid.NewGuid():N}");
+        var theirResults = await new NotesService(theirs).SearchAsync($"secretword-{unique}", 1, 20);
+
+        Assert.Empty(theirResults);
     }
 }

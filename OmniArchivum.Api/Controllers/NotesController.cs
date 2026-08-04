@@ -1,10 +1,15 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using OmniArchivum.Api.Models.DTOs;
 using OmniArchivum.Api.Services;
 
 
 namespace OmniArchivum.Api.Controllers;
 
+// Every note belongs to a session, so a caller without a valid one gets 401 rather than
+// an empty archive — that way a client can tell "nothing here" from "your token expired"
+// and go get a new session instead of silently showing an empty page.
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class NotesController : ControllerBase

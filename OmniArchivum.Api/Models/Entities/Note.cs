@@ -1,9 +1,16 @@
 ﻿namespace OmniArchivum.Api.Models.Entities;
 using NpgsqlTypes;
 
-public class Note
+public class Note : IOwnedEntity
 {
     public Guid Id { get; set; } = Guid.NewGuid();
+
+    /// <summary>
+    /// Who this note belongs to: "guest:{guid}" for a sandboxed visitor session, or
+    /// "user:{name}" for the signed-in owner. A global query filter scopes every read
+    /// to the current request's owner, so one database serves everyone in isolation.
+    /// </summary>
+    public string OwnerKey { get; set; } = string.Empty;
 
     public string Title { get; set; } = string.Empty;
 

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using OmniArchivum.Api.Data;
+using OmniArchivum.Api.Services;
 using Testcontainers.PostgreSql;
 
 namespace OmniArchivum.Api.Tests.Integration;
@@ -30,13 +31,17 @@ public sealed class PostgresFixture : IAsyncLifetime
         await _container.DisposeAsync();
     }
 
-    public OmniArchivumDbContext CreateContext()
+    /// <summary>
+    /// A context scoped to a specific owner. Tests that touch note or tag data must pass
+    /// one, since every query is filtered by owner.
+    /// </summary>
+    public OmniArchivumDbContext CreateContext(string? ownerKey = null)
     {
         var options = new DbContextOptionsBuilder<OmniArchivumDbContext>()
             .UseNpgsql(ConnectionString)
             .Options;
 
-        return new OmniArchivumDbContext(options);
+        return new OmniArchivumDbContext(options, new StaticOwnerContext(ownerKey));
     }
 }
 

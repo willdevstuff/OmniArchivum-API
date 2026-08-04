@@ -1,31 +1,49 @@
+using Microsoft.EntityFrameworkCore;
 using OmniArchivum.Api.Models.Entities;
 
 namespace OmniArchivum.Api.Data;
 
 /// <summary>
-/// Seeds a small set of representative notes the first time the API runs against an
-/// empty database. This exists so the public demo shows the app doing something real
-/// — full-text search, multi-tag filtering, category colours, Markdown rendering —
-/// rather than an empty grid. Anything here can be edited or deleted like normal data.
+/// Gives every new session its own copy of a small representative archive, so the demo
+/// shows the app doing something real — full-text search, multi-tag filtering, category
+/// colours, Markdown rendering — rather than an empty grid. Because the copy belongs to
+/// the session that requested it, a visitor can edit or delete any of it freely without
+/// affecting anyone else.
 /// </summary>
 public static class DemoData
 {
-    public static void SeedIfEmpty(OmniArchivumDbContext db)
+    /// <summary>
+    /// Populates the demo archive for a single owner. Safe to call more than once for the
+    /// same owner: it no-ops if that owner already has notes.
+    /// </summary>
+    public static async Task SeedForOwnerAsync(OmniArchivumDbContext db, string ownerKey)
     {
-        if (db.Notes.Any()) return;
+        // Query filters are driven by the *request's* owner, which isn't necessarily the
+        // one being seeded, so scope explicitly here.
+        var alreadySeeded = await db.Notes
+            .IgnoreQueryFilters()
+            .AnyAsync(n => n.OwnerKey == ownerKey);
 
-        var unity = new Tag { Name = "unity", Category = "tool" };
-        var fmod = new Tag { Name = "fmod", Category = "tool" };
-        var ableton = new Tag { Name = "ableton", Category = "tool" };
-        var postgres = new Tag { Name = "postgres", Category = "tool" };
-        var csharp = new Tag { Name = "csharp", Category = "language" };
-        var javascript = new Tag { Name = "javascript", Category = "language" };
-        var audio = new Tag { Name = "audio", Category = "topic" };
-        var performance = new Tag { Name = "performance", Category = "topic" };
+        if (alreadySeeded) return;
+
+        Build(db, ownerKey);
+        await db.SaveChangesAsync();
+    }
+
+    private static void Build(OmniArchivumDbContext db, string ownerKey)
+    {
+        var unity = new Tag { OwnerKey = ownerKey, Name = "unity", Category = "tool" };
+        var fmod = new Tag { OwnerKey = ownerKey, Name = "fmod", Category = "tool" };
+        var ableton = new Tag { OwnerKey = ownerKey, Name = "ableton", Category = "tool" };
+        var postgres = new Tag { OwnerKey = ownerKey, Name = "postgres", Category = "tool" };
+        var csharp = new Tag { OwnerKey = ownerKey, Name = "csharp", Category = "language" };
+        var javascript = new Tag { OwnerKey = ownerKey, Name = "javascript", Category = "language" };
+        var audio = new Tag { OwnerKey = ownerKey, Name = "audio", Category = "topic" };
+        var performance = new Tag { OwnerKey = ownerKey, Name = "performance", Category = "topic" };
 
         var now = DateTimeOffset.UtcNow;
 
-        AddNote(db, now.AddDays(-1), "FMOD footstep surfaces",
+        AddNote(db, ownerKey, now.AddDays(-1), "FMOD footstep surfaces",
             """
             Driving footstep variation from a single event instead of one event per surface.
 
@@ -48,7 +66,7 @@ public static class DemoData
             """,
             unity, fmod, audio);
 
-        AddNote(db, now.AddDays(-3), "Ableton vocal chain",
+        AddNote(db, ownerKey, now.AddDays(-3), "Ableton vocal chain",
             """
             Default starting point for a dry vocal take. Adjust to taste, but this order matters.
 
@@ -62,7 +80,7 @@ public static class DemoData
             """,
             ableton, audio);
 
-        AddNote(db, now.AddDays(-5), "EF Core global query filters",
+        AddNote(db, ownerKey, now.AddDays(-5), "EF Core global query filters",
             """
             Soft delete is far less error-prone as a model-level filter than as a `Where`
             clause repeated in every query.
@@ -81,7 +99,7 @@ public static class DemoData
             """,
             csharp, postgres);
 
-        AddNote(db, now.AddDays(-8), "PostgreSQL full-text search with tsvector",
+        AddNote(db, ownerKey, now.AddDays(-8), "PostgreSQL full-text search with tsvector",
             """
             A generated `tsvector` column plus a GIN index gives real full-text search
             without any external search service.
@@ -102,7 +120,7 @@ public static class DemoData
             """,
             postgres, performance);
 
-        AddNote(db, now.AddDays(-11), "Unity object pooling",
+        AddNote(db, ownerKey, now.AddDays(-11), "Unity object pooling",
             """
             Instantiating and destroying frequently-spawned objects causes GC spikes that
             show up as frame hitches. Pool them instead.
@@ -129,7 +147,7 @@ public static class DemoData
             """,
             unity, csharp, performance);
 
-        AddNote(db, now.AddDays(-14), "Handling fetch errors properly",
+        AddNote(db, ownerKey, now.AddDays(-14), "Handling fetch errors properly",
             """
             `fetch` only rejects on network failure — a 404 or 500 still resolves. Checking
             `res.ok` explicitly is the difference between a real error message and a
@@ -148,7 +166,7 @@ public static class DemoData
             """,
             javascript);
 
-        AddNote(db, now.AddDays(-18), "Reverb send buses",
+        AddNote(db, ownerKey, now.AddDays(-18), "Reverb send buses",
             """
             Shared reverb buses are the main tool for making sources sound like they're in
             the same room.
@@ -161,12 +179,11 @@ public static class DemoData
             the reasoning doesn't.
             """,
             fmod, ableton, audio);
-
-        db.SaveChanges();
     }
 
     private static void AddNote(
         OmniArchivumDbContext db,
+        string ownerKey,
         DateTimeOffset timestamp,
         string title,
         string bodyMarkdown,
@@ -174,6 +191,9 @@ public static class DemoData
     {
         var note = new Note
         {
+            // Set explicitly rather than relying on SaveChanges stamping it, since seeding
+            // runs for the session being created, which isn't the request's owner yet.
+            OwnerKey = ownerKey,
             Title = title,
             BodyMarkdown = bodyMarkdown,
             CreatedUtc = timestamp,
