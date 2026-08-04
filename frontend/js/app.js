@@ -10,6 +10,7 @@ import {
   removeTagFromNote,
   deleteTag,
 } from "./api.js";
+import { renderMarkdown } from "./markdown.js";
 
 const PAGE_SIZE = 20;
 
@@ -77,6 +78,39 @@ function confirmAction(message) {
     el.confirmOkBtn.addEventListener("click", onOk);
     el.confirmDialog.addEventListener("cancel", onEscape);
   });
+}
+
+// The API runs on Azure Container Apps with min-replicas 0, so the first request
+// after an idle period has to wait for a container to start — around 20-25 seconds.
+// Rather than leave a visitor looking at an empty page, show a spinner immediately
+// and explain what's happening once the wait stops looking like ordinary latency.
+const COLD_START_HINT_MS = 2500;
+
+let coldStartTimer = null;
+
+function showLoading() {
+  clearTimeout(coldStartTimer);
+
+  el.notesGrid.innerHTML = `
+    <div class="loading" role="status" aria-live="polite">
+      <div class="spinner" aria-hidden="true"></div>
+      <p class="loading-text">Loading notes&hellip;</p>
+      <p class="loading-hint" hidden>
+        The API scales to zero when idle, so the first request has to wake it up.
+        This usually takes 20&ndash;30 seconds, then everything is fast.
+      </p>
+    </div>
+  `;
+
+  coldStartTimer = setTimeout(() => {
+    const hint = el.notesGrid.querySelector(".loading-hint");
+    if (hint) hint.hidden = false;
+  }, COLD_START_HINT_MS);
+}
+
+function clearLoading() {
+  clearTimeout(coldStartTimer);
+  coldStartTimer = null;
 }
 
 function showStatus(message, isError = false) {
@@ -224,6 +258,7 @@ function populateTagSelect(select, note) {
 
 function renderNotes() {
   el.notesGrid.innerHTML = "";
+  const overflowChecks = [];
 
   if (state.notes.length === 0) {
     const empty = document.createElement("p");
@@ -248,17 +283,16 @@ function renderNotes() {
 
     titleEl.textContent = note.title;
 
-    const isLong = note.bodyMarkdown.length > 220;
-    bodyEl.textContent = isLong ? `${note.bodyMarkdown.slice(0, 220)}…` : note.bodyMarkdown;
-    if (isLong) {
-      expandBtn.hidden = false;
-      expandBtn.addEventListener("click", () => {
-        const expanded = bodyEl.dataset.expanded === "true";
-        bodyEl.textContent = expanded ? `${note.bodyMarkdown.slice(0, 220)}…` : note.bodyMarkdown;
-        bodyEl.dataset.expanded = expanded ? "false" : "true";
-        expandBtn.textContent = expanded ? "Show more" : "Show less";
-      });
-    }
+    // Safe: renderMarkdown escapes the source before generating any markup.
+    bodyEl.innerHTML = renderMarkdown(note.bodyMarkdown);
+
+    // Whether a note needs "Show more" depends on how tall the rendered Markdown
+    // actually is, not on its character count, so it's measured after layout below.
+    expandBtn.addEventListener("click", () => {
+      const collapsed = bodyEl.classList.toggle("collapsed");
+      expandBtn.textContent = collapsed ? "Show more" : "Show less";
+    });
+    overflowChecks.push({ bodyEl, expandBtn });
 
     for (const tag of note.tags) {
       const tagEl = document.createElement("span");
@@ -327,6 +361,14 @@ function renderNotes() {
     el.notesGrid.appendChild(fragment);
   }
 
+  // Only offer "Show more" on notes whose rendered body is actually clipped. This has
+  // to happen after the cards are in the document, since it depends on real layout.
+  for (const { bodyEl, expandBtn } of overflowChecks) {
+    if (bodyEl.scrollHeight > bodyEl.clientHeight + 4) {
+      expandBtn.hidden = false;
+    }
+  }
+
   el.pageIndicator.textContent = `Page ${state.page}`;
   el.prevPageBtn.disabled = state.page <= 1;
   el.nextPageBtn.disabled = !state.hasNextPage;
@@ -334,6 +376,7 @@ function renderNotes() {
 
 async function loadNotes() {
   clearStatus();
+  showLoading();
   try {
     let results;
     if (state.mode === "search") {
@@ -347,8 +390,11 @@ async function loadNotes() {
     }
     state.notes = results;
     state.hasNextPage = results.length === PAGE_SIZE;
+    clearLoading();
     renderNotes();
   } catch (err) {
+    clearLoading();
+    el.notesGrid.innerHTML = "";
     showStatus(`Couldn't load notes: ${err.message}`, true);
   }
 }
