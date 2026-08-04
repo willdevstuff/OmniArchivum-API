@@ -1,4 +1,7 @@
-const API_BASE = "http://localhost:5000/api";
+const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+const API_BASE = isLocal
+  ? "http://localhost:5000/api"
+  : "https://omniarchivum-api.proudmoss-5344fb15.uksouth.azurecontainerapps.io/api";
 
 async function handleResponse(res) {
   if (res.status === 204) return null;

@@ -26,7 +26,10 @@ builder.Services.AddHealthChecks()
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("Frontend", policy =>
-        policy.AllowAnyOrigin()
+        policy.WithOrigins(
+                "https://mango-ground-058108a0f.7.azurestaticapps.net",
+                "http://localhost:8080",
+                "http://127.0.0.1:8080")
               .AllowAnyMethod()
               .AllowAnyHeader());
 });
