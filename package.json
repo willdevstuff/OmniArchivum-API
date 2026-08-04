@@ -1,0 +1,9 @@
+{
+  "name": "omniarchivum",
+  "private": true,
+  "type": "module",
+  "description": "Dev-only tooling for the frontend test suite. The frontend itself ships with no dependencies and no build step.",
+  "scripts": {
+    "test": "node --test \"tests/**/*.test.js\""
+  }
+}
